@@ -1,0 +1,1365 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Car Safety Simulator</title>
+    <style>
+      :root {
+        --bg: #f3f3f0;
+        --box: #ffffff;
+        --ink: #222;
+        --muted: #666;
+        --line: #d6d6d0;
+        --head: #e9e9e4;
+        --accent: #2a7a50;
+        --link: #1f5fa8;
+        --good: #dcefd9;
+        --warn: #f7efc9;
+        --bad: #f5d9d5;
+        --font: Verdana, Geneva, Tahoma, sans-serif;
+        --num: Consolas, "Courier New", monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #1b1c1e;
+          --box: #242528;
+          --ink: #e4e4e1;
+          --muted: #a0a09b;
+          --line: #3a3b3f;
+          --head: #2e2f33;
+          --accent: #5cc48c;
+          --link: #7fb2f0;
+          --good: #22382a;
+          --warn: #3b3520;
+          --bad: #432624;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --bg: #1b1c1e;
+        --box: #242528;
+        --ink: #e4e4e1;
+        --muted: #a0a09b;
+        --line: #3a3b3f;
+        --head: #2e2f33;
+        --accent: #5cc48c;
+        --link: #7fb2f0;
+        --good: #22382a;
+        --warn: #3b3520;
+        --bad: #432624;
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--font);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding-left: max(16px, env(safe-area-inset-left, 0px));
+        padding-right: max(16px, env(safe-area-inset-right, 0px));
+      }
+      header.top {
+        padding-block: 22px 10px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 26px;
+        font-weight: bold;
+      }
+      .by {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .intro {
+        margin: 10px 0 0;
+        max-width: 70ch;
+      }
+      main {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding-bottom: 36px;
+      }
+
+      .stage {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .canvas-box {
+        position: relative;
+        background: #2e3335;
+        border: 2px solid #444;
+      }
+      #cv {
+        display: block;
+        width: 100%;
+        height: clamp(190px, 28vw, 290px);
+      }
+      .chip {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        font-size: 12px;
+        font-weight: bold;
+        padding: 3px 8px;
+        background: #fff;
+        color: #222;
+        border: 1px solid #222;
+      }
+      .chip[data-s="Braking"] {
+        background: #e5463b;
+        color: #fff;
+      }
+      .chip[data-s="Thinking"] {
+        background: #f2c14e;
+      }
+      .chip[data-s="Changing lane"] {
+        background: #8ec6ff;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 16px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .legend i {
+        display: inline-block;
+        width: 12px;
+        height: 9px;
+        margin-right: 5px;
+        vertical-align: 0;
+        border: 1px solid rgba(0, 0, 0, 0.25);
+      }
+
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 760px) {
+        .grid2 {
+          grid-template-columns: 1fr;
+        }
+      }
+      fieldset.panel {
+        background: var(--box);
+        border: 1px solid var(--line);
+        margin: 0;
+        padding: 12px 16px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-width: 0;
+      }
+      legend {
+        font-weight: bold;
+        font-size: 15px;
+        padding: 0 6px;
+      }
+      .sub {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        max-width: 72ch;
+      }
+
+      .field {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0 10px;
+        align-items: baseline;
+      }
+      .field label {
+        font-weight: bold;
+      }
+      .field output {
+        font-family: var(--num);
+        font-size: 14px;
+      }
+      .field .hint {
+        grid-column: 1/-1;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .field input[type="range"] {
+        grid-column: 1/-1;
+        width: 100%;
+        accent-color: var(--accent);
+        margin: 2px 0;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 14px;
+        align-items: center;
+      }
+      select,
+      input[type="text"],
+      input[type="number"] {
+        font: inherit;
+        font-size: 13px;
+        color: var(--ink);
+        background: var(--box);
+        border: 1px solid #999;
+        padding: 3px 5px;
+        min-width: 0;
+      }
+      .inline {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 13px;
+      }
+      .check {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .check input {
+        accent-color: var(--accent);
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 4px 14px;
+        margin: 0;
+      }
+      .stats div {
+        display: contents;
+      }
+      .stats dt {
+        color: var(--muted);
+      }
+      .stats dd {
+        margin: 0;
+        font-family: var(--num);
+        font-size: 15px;
+        font-weight: bold;
+        font-variant-numeric: tabular-nums;
+      }
+      .stats dd.alert {
+        color: #d23b30;
+      }
+      .last {
+        font-size: 13px;
+        color: var(--muted);
+        min-height: 1.5em;
+        margin: 0;
+      }
+
+      button {
+        font: inherit;
+        font-size: 13px;
+        padding: 4px 12px;
+        border: 1px solid #888;
+        border-radius: 3px;
+        background: linear-gradient(#fdfdfc, #e4e4df);
+        color: #222;
+        cursor: pointer;
+      }
+      button:hover {
+        background: linear-gradient(#fff, #d9d9d3);
+      }
+      button:active {
+        background: #d3d3cc;
+      }
+      button:focus-visible,
+      select:focus-visible,
+      input:focus-visible {
+        outline: 2px solid var(--link);
+        outline-offset: 1px;
+      }
+      button.primary {
+        background: linear-gradient(#3b9566, #2a7a50);
+        border-color: #1e5c3b;
+        color: #fff;
+        font-weight: bold;
+      }
+      button.primary:hover {
+        background: linear-gradient(#43a06f, #2f8558);
+      }
+      button[aria-pressed="true"] {
+        background: #555;
+        color: #fff;
+        border-color: #333;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .seg {
+        display: inline-flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+
+      .exp-inputs {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+      @media (max-width: 760px) {
+        .exp-inputs {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .progress {
+        height: 8px;
+        background: var(--head);
+        border: 1px solid var(--line);
+      }
+      .progress span {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: var(--accent);
+      }
+      .note {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0;
+      }
+      h3 {
+        margin: 4px 0 0;
+        font-size: 14px;
+      }
+
+      .scroll {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 13px;
+      }
+      th,
+      td {
+        padding: 5px 9px;
+        text-align: right;
+        white-space: nowrap;
+        border: 1px solid var(--line);
+      }
+      th {
+        background: var(--head);
+        font-weight: bold;
+        position: sticky;
+        top: 0;
+      }
+      td {
+        font-family: var(--num);
+        font-variant-numeric: tabular-nums;
+      }
+      tbody tr:nth-child(even) td {
+        background: color-mix(in srgb, var(--head) 45%, transparent);
+      }
+      .results-wrap {
+        max-height: 320px;
+        overflow: auto;
+      }
+      .empty {
+        padding: 16px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .matrix td {
+        text-align: center;
+        padding: 8px;
+        line-height: 1.3;
+      }
+      .matrix tbody tr:nth-child(even) td {
+        background: none;
+      }
+      .matrix .cell b {
+        display: block;
+        font-size: 16px;
+      }
+      .matrix .cell small {
+        color: var(--muted);
+        font-size: 11px;
+        font-family: var(--font);
+      }
+      .matrix td.cell.good {
+        background: var(--good);
+      }
+      .matrix td.cell.warn {
+        background: var(--warn);
+      }
+      .matrix td.cell.bad {
+        background: var(--bad);
+      }
+      .best-tag {
+        display: inline-block;
+        margin-top: 3px;
+        font: bold 11px var(--font);
+        color: var(--accent);
+      }
+      .mermaid {
+        background: var(--box);
+        padding: 8px;
+        overflow-x: auto;
+        margin: 0;
+      }
+      footer {
+        color: var(--muted);
+        font-size: 12px;
+        padding-bottom: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="top">
+      <div class="wrap">
+        <h1>AI Car Safety Simulator</h1>
+        <p class="by">Zane &mdash; Engineering 5/6 design project</p>
+        <p class="intro">
+          The green car drives itself. Use the sliders to change how far it can see and
+          how long it takes to react, then watch how many crashes happen in random
+          traffic.
+        </p>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="stage" aria-label="Road view">
+        <div class="canvas-box">
+          <canvas
+            id="cv"
+            aria-label="Top-down view of a three-lane road with the AI car, traffic and people crossing"
+          ></canvas>
+          <div class="chip" id="chip" data-s="Cruising">Cruising</div>
+        </div>
+        <div class="legend">
+          <span><i style="background: #2fb47a"></i>AI car</span>
+          <span><i style="background: rgba(242, 193, 78, 0.6)"></i>Viewing distance</span>
+          <span
+            ><i style="background: #ff5a4e"></i>Where the car thinks the obstacle is (old
+            info)</span
+          >
+          <span><i style="background: #f2e6d0; border-radius: 50%"></i>Person</span>
+        </div>
+      </section>
+
+      <section class="grid2">
+        <fieldset class="panel">
+          <legend>Settings</legend>
+          <div class="field">
+            <label for="view">Viewing distance</label><output id="viewOut">50 m</output>
+            <input type="range" id="view" min="10" max="150" step="5" value="50" />
+            <span class="hint">How far ahead the car checks for cars and people.</span>
+          </div>
+          <div class="field">
+            <label for="think">Thinking time</label><output id="thinkOut">300 ms</output>
+            <input type="range" id="think" min="0" max="2000" step="50" value="300" />
+            <span class="hint"
+              >How long it waits after seeing something before it reacts.</span
+            >
+          </div>
+          <div class="field">
+            <label for="limit">Speed limit</label><output id="limitOut">55 mph</output>
+            <input type="range" id="limit" min="25" max="75" step="5" value="55" />
+          </div>
+          <div class="row">
+            <label class="inline" for="traffic"
+              >Traffic
+              <select id="traffic">
+                <option value="6">Light</option>
+                <option value="12" selected>Medium</option>
+                <option value="20">Heavy</option>
+              </select>
+            </label>
+            <label class="inline" for="peds"
+              >People crossing
+              <select id="peds">
+                <option value="0">None</option>
+                <option value="400">Some</option>
+                <option value="200" selected>Often</option>
+                <option value="100">A lot</option>
+              </select>
+            </label>
+            <label class="check" for="lanes"
+              ><input type="checkbox" id="lanes" checked />Lane changes on</label
+            >
+          </div>
+        </fieldset>
+
+        <fieldset class="panel">
+          <legend>Counters</legend>
+          <dl class="stats">
+            <div>
+              <dt>Speed</dt>
+              <dd id="sSpeed">0</dd>
+            </div>
+            <div>
+              <dt>Time</dt>
+              <dd id="sTime">0:00</dd>
+            </div>
+            <div>
+              <dt>Distance</dt>
+              <dd id="sDist">0 m</dd>
+            </div>
+            <div>
+              <dt>Car crashes</dt>
+              <dd id="sCrash">0</dd>
+            </div>
+            <div>
+              <dt>People hit</dt>
+              <dd id="sHit">0</dd>
+            </div>
+            <div>
+              <dt>Longest safe stretch</dt>
+              <dd id="sBest">0 m</dd>
+            </div>
+          </dl>
+          <p class="last" id="last">No crashes yet.</p>
+          <div class="row">
+            <span>Speed:</span>
+            <div class="seg" role="group" aria-label="Simulation speed">
+              <button data-speed="1" aria-pressed="true">1x</button>
+              <button data-speed="4" aria-pressed="false">4x</button>
+              <button data-speed="10" aria-pressed="false">10x</button>
+            </div>
+            <button id="pause">Pause</button>
+            <button id="reset">Restart</button>
+          </div>
+        </fieldset>
+      </section>
+
+      <fieldset class="panel">
+        <legend>Experiment</legend>
+        <p class="sub">
+          This runs every mix of viewing distance and thinking time in the background (no
+          drawing, so it's fast). It uses the speed limit, traffic and people settings
+          from above.
+        </p>
+        <div class="exp-inputs">
+          <label class="inline" for="views"
+            >Viewing distances (m)<input type="text" id="views" value="20, 50, 90"
+          /></label>
+          <label class="inline" for="thinks"
+            >Thinking times (ms)<input type="text" id="thinks" value="100, 500, 1000"
+          /></label>
+          <label class="inline" for="trials"
+            >Runs per mix<input type="number" id="trials" min="1" max="10" value="3"
+          /></label>
+          <label class="inline" for="dur"
+            >Length of each run<select id="dur">
+              <option value="60">1 minute</option>
+              <option value="120" selected>2 minutes</option>
+              <option value="300">5 minutes</option>
+            </select></label
+          >
+        </div>
+        <div class="row">
+          <button class="primary" id="runAll">Run all mixes</button>
+          <button id="runOne">Test current settings</button>
+          <button id="stop" disabled>Stop</button>
+          <span class="note" id="progText"></span>
+        </div>
+        <div class="progress" aria-hidden="true"><span id="prog"></span></div>
+        <p class="note">
+          To keep it fair, run 1 of every mix uses the same random traffic and people, run
+          2 uses a different set, and so on.
+        </p>
+
+        <h3>Results: incidents per km (lower = safer)</h3>
+        <div class="scroll" id="matrix">
+          <div class="empty">Run the experiment to fill this in.</div>
+        </div>
+
+        <div class="row" style="justify-content: space-between">
+          <h3>All runs</h3>
+          <div class="row">
+            <button id="copy">Copy for spreadsheet</button
+            ><button id="clear">Clear results</button>
+          </div>
+        </div>
+        <div class="scroll results-wrap">
+          <table id="results">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>View (m)</th>
+                <th>Think (ms)</th>
+                <th>Run</th>
+                <th>Crashes</th>
+                <th>People hit</th>
+                <th>Distance (m)</th>
+                <th>Longest safe (m)</th>
+                <th>Avg mph</th>
+                <th>Incidents/km</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <div class="empty" id="rowsEmpty">No runs yet.</div>
+        </div>
+        <textarea
+          id="csvBox"
+          hidden
+          readonly
+          style="width: 100%; height: 120px; font: 12px var(--num)"
+        ></textarea>
+      </fieldset>
+
+      <fieldset class="panel">
+        <legend>How the AI decides (every frame)</legend>
+        <p class="sub">The loop runs 60 times a second.</p>
+        <pre class="mermaid">
+flowchart TD
+  A["New frame"] --> B{"Anything inside the viewing distance?"}
+  B -- "No" --> C["Remember: road is clear"]
+  B -- "Yes" --> D["Remember: what it is, how far, how fast"]
+  C --> E["Wait the thinking time: act on what it saw that long ago"]
+  D --> E
+  E --> F{"Old view shows something close?"}
+  F -- "No" --> G["Speed up to the speed limit"]
+  F -- "Yes" --> H{"Is the next lane clear?"}
+  H -- "Yes" --> I["Change lanes"]
+  H -- "No" --> J["Slow down or stop"]
+  G --> K["Move the car, check for crashes, update counters"]
+  I --> K
+  J --> K
+  K --> A
+</pre
+        >
+      </fieldset>
+    </main>
+    <footer class="wrap">Made with HTML, CSS and JavaScript.</footer>
+
+    <script>
+      const L = 4.6,
+        W = 1.9,
+        LANE = 3.6,
+        NL = 3,
+        ROAD = LANE * NL,
+        DT = 1 / 60,
+        MPH = 2.23694;
+      const laneY = (i) => (i + 0.5) * LANE;
+      function rng(seed) {
+        let a = seed >>> 0;
+        return () => {
+          a = (a + 0x6d2b79f5) | 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      const fmtTime = (s) => {
+        s = Math.floor(s);
+        return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+      };
+
+      class Sim {
+        constructor(o) {
+          this.o = { ...o };
+          this.r = rng(o.seed);
+          this.t = 0;
+          this.ai = {
+            x: 0,
+            y: laneY(1),
+            lane: 1,
+            tgt: 1,
+            v: o.cruise * 0.8,
+            a: 0,
+            lcCool: 0,
+            state: "Cruising",
+          };
+          this.cars = [];
+          this.peds = [];
+          this.hist = [];
+          this.seen = null;
+          this.cur = null;
+          this.s = { crashes: 0, hits: 0, dist: 0, streak: 0, best: 0, last: "" };
+          this.cool = 0;
+          this.flash = 0;
+          this.nextPed = 40 + this.r() * 60;
+          for (let i = 0; i < 200 && this.cars.length < o.traffic; i++)
+            this.trySpawn(i % 5 === 0 ? -60 + this.r() * 45 : 20 + this.r() * 360);
+        }
+        trySpawn(dx) {
+          const lane = Math.floor(this.r() * NL),
+            x = this.ai.x + dx;
+          if (lane === this.ai.lane && Math.abs(dx) < 25) return false;
+          for (const c of this.cars)
+            if (Math.abs(c.y - laneY(lane)) < 2.5 && Math.abs(c.x - x) < 20) return false;
+          const vd = 10 + this.r() * (this.o.cruise - 12);
+          this.cars.push({
+            x,
+            y: laneY(lane),
+            lane,
+            tgt: lane,
+            v: vd * (0.85 + this.r() * 0.15),
+            vd,
+            brake: 0,
+            a: 0,
+            col: Math.floor(this.r() * 5),
+          });
+          return true;
+        }
+        ahead(x, y, band, self, maxD) {
+          let best = null;
+          const take = (ox, oy, half, ov, kind, obj, b) => {
+            if (obj === self || ox <= x || Math.abs(oy - y) > b) return;
+            const gap = ox - half - (x + L / 2);
+            if (gap > maxD) return;
+            if (!best || gap < best.gap) best = { gap, vo: ov, kind };
+          };
+          for (const c of this.cars) take(c.x, c.y, L / 2, c.v, "car", c, band);
+          if (self !== this.ai)
+            take(this.ai.x, this.ai.y, L / 2, this.ai.v, "car", this.ai, band);
+          for (const p of this.peds)
+            if (p.state === "cross") take(p.x, p.y, 0.3, 0, "person", p, band + 0.8);
+          return best;
+        }
+        laneClear(l) {
+          const a = this.ai,
+            y = laneY(l),
+            v = this.o.view;
+          for (const c of this.cars)
+            if (Math.abs(c.y - y) < 2.4) {
+              const dx = c.x - a.x;
+              if (dx > -L - 6 && dx < v + L) return false;
+            }
+          for (const p of this.peds)
+            if (p.state === "cross" && Math.abs(p.y - y) < 3) {
+              const dx = p.x - a.x;
+              if (dx > -2 && dx < v) return false;
+            }
+          return true;
+        }
+        stepAI() {
+          const a = this.ai,
+            o = this.o;
+          let cur = this.ahead(a.x, a.y, 2.3, a, o.view);
+          if (a.tgt !== a.lane) {
+            const c2 = this.ahead(a.x, laneY(a.tgt), 2.3, a, o.view);
+            if (c2 && (!cur || c2.gap < cur.gap)) cur = c2;
+          }
+          this.hist.push({
+            t: this.t,
+            o: cur,
+            clear: [0, 1, 2].map((l) => this.laneClear(l)),
+          });
+          const lag = o.think / 1000;
+          while (this.hist.length > 1 && this.hist[1].t <= this.t - lag + 1e-9)
+            this.hist.shift();
+          const d = this.hist[0],
+            seen = d.o,
+            v = a.v;
+          const free = Math.min(2.6, (o.cruise - v) * 0.7);
+          let acc = free;
+          if (seen) {
+            const room = seen.gap - (seen.kind === "person" ? 5 : 3);
+            if (room <= 0.3) acc = -9;
+            else {
+              const need = (v * v - seen.vo * seen.vo) / (2 * room);
+              const follow = Math.max(10, v * 1.5);
+              if (v > seen.vo + 0.2 && need > 1) acc = -Math.min(9, need * 1.25 + 0.3);
+              else if (seen.kind === "car" && seen.gap < follow)
+                acc = Math.max(
+                  -4,
+                  Math.min(1.5, (seen.vo - v) * 0.8 + (seen.gap - follow) * 0.1),
+                );
+            }
+            if (
+              o.lanes &&
+              a.tgt === a.lane &&
+              a.lcCool <= 0 &&
+              seen.kind === "car" &&
+              seen.vo < o.cruise - 3 &&
+              seen.gap < Math.max(25, v * 2.5)
+            ) {
+              for (const l of [a.lane - 1, a.lane + 1])
+                if (l >= 0 && l < NL && d.clear[l]) {
+                  a.tgt = l;
+                  a.lcCool = 4;
+                  break;
+                }
+            }
+          }
+          acc = Math.min(acc, free);
+          a.lcCool -= DT;
+          if (a.tgt !== a.lane) {
+            const ty = laneY(a.tgt),
+              st = 2.6 * DT;
+            if (Math.abs(ty - a.y) <= st) {
+              a.y = ty;
+              a.lane = a.tgt;
+            } else a.y += Math.sign(ty - a.y) * st;
+          }
+          a.v = Math.max(0, v + acc * DT);
+          a.a = acc;
+          const dx = a.v * DT;
+          a.x += dx;
+          this.s.dist += dx;
+          this.s.streak += dx;
+          if (this.s.streak > this.s.best) this.s.best = this.s.streak;
+          this.cur = cur;
+          this.seen = seen;
+          a.state =
+            acc < -1.5
+              ? "Braking"
+              : a.tgt !== a.lane
+                ? "Changing lane"
+                : cur && !seen
+                  ? "Thinking"
+                  : seen
+                    ? "Following"
+                    : "Cruising";
+        }
+        stepTraffic() {
+          const a = this.ai;
+          for (const c of this.cars) {
+            let lead = this.ahead(c.x, c.y, 2.2, c, 150);
+            if (c.tgt !== c.lane) {
+              const l2 = this.ahead(c.x, laneY(c.tgt), 2.2, c, 150);
+              if (l2 && (!lead || l2.gap < lead.gap)) lead = l2;
+            }
+            const amax = 1.6,
+              b = 3;
+            let acc = amax * (1 - Math.pow(c.v / c.vd, 4));
+            if (lead) {
+              const s = Math.max(0.1, lead.gap),
+                ss = 2 + c.v * 1.2 + (c.v * (c.v - lead.vo)) / (2 * Math.sqrt(amax * b));
+              acc -= amax * Math.pow(Math.max(0, ss) / s, 2);
+            }
+            if (c.brake > 0) {
+              c.brake -= DT;
+              acc = Math.min(acc, -6.5);
+            }
+            acc = Math.max(-9, acc);
+            c.a = acc;
+            c.v = Math.max(0, c.v + acc * DT);
+            c.x += c.v * DT;
+            if (c.x > a.x + 10 && c.x < a.x + 220 && this.r() < 0.015 * DT)
+              c.brake = 0.6 + this.r() * 1.2;
+            if (c.tgt === c.lane && this.r() < 0.05 * DT) {
+              const l = c.lane + (this.r() < 0.5 ? -1 : 1);
+              if (l >= 0 && l < NL && this.gapOk(c, l)) c.tgt = l;
+            }
+            if (c.tgt !== c.lane) {
+              const ty = laneY(c.tgt),
+                st = 2.4 * DT;
+              if (Math.abs(ty - c.y) <= st) {
+                c.y = ty;
+                c.lane = c.tgt;
+              } else c.y += Math.sign(ty - c.y) * st;
+            }
+          }
+          this.cars = this.cars.filter((c) => c.x > a.x - 90 && c.x < a.x + 520);
+          if (this.cars.length < this.o.traffic && this.r() < 0.05)
+            this.trySpawn(260 + this.r() * 140);
+        }
+        gapOk(c, l) {
+          const y = laneY(l),
+            chk = (ox, oy) => Math.abs(oy - y) < 2.4 && ox - c.x > -8 && ox - c.x < 12;
+          if (chk(this.ai.x, this.ai.y)) return false;
+          for (const o of this.cars) if (o !== c && chk(o.x, o.y)) return false;
+          return true;
+        }
+        stepPeople() {
+          const a = this.ai;
+          if (this.o.peds > 0 && a.x > this.nextPed) {
+            const top = this.r() < 0.5;
+            this.peds.push({
+              x: a.x + 230 + this.r() * 80,
+              y: top ? -1.3 : ROAD + 1.3,
+              dir: top ? 1 : -1,
+              state: "wait",
+              trigger: 15 + this.r() * 110,
+              sp: 1.2 + this.r() * 1.3,
+            });
+            this.nextPed += this.o.peds * (0.5 + this.r());
+          }
+          for (const p of this.peds) {
+            if (p.state === "wait" && p.x - a.x < p.trigger) p.state = "cross";
+            if (p.state === "cross") {
+              p.y += p.dir * p.sp * DT;
+              if (p.y < -1.4 || p.y > ROAD + 1.4) p.state = "done";
+            }
+          }
+          this.peds = this.peds.filter((p) => p.state !== "done" && p.x > a.x - 80);
+        }
+        incident(msg) {
+          this.s.streak = 0;
+          this.cool = 1;
+          this.flash = 0.6;
+          this.s.last = msg + " at " + fmtTime(this.t);
+        }
+        collide() {
+          const a = this.ai;
+          if (this.cool > 0) {
+            this.cool -= DT;
+            return;
+          }
+          for (let i = 0; i < this.cars.length; i++) {
+            const c = this.cars[i];
+            if (Math.abs(c.x - a.x) < L - 0.1 && Math.abs(c.y - a.y) < W - 0.05) {
+              this.cars.splice(i, 1);
+              if (c.x < a.x - L * 0.5) {
+                this.cool = 0.5;
+                return;
+              }
+              this.s.crashes++;
+              a.v = 0;
+              this.incident("Crashed into a car");
+              return;
+            }
+          }
+          for (let i = 0; i < this.peds.length; i++) {
+            const p = this.peds[i];
+            if (
+              p.state === "cross" &&
+              Math.abs(p.x - a.x) < L / 2 + 0.3 &&
+              Math.abs(p.y - a.y) < W / 2 + 0.3
+            ) {
+              this.peds.splice(i, 1);
+              this.s.hits++;
+              a.v = 0;
+              this.incident("Hit a person");
+              return;
+            }
+          }
+        }
+        step() {
+          this.t += DT;
+          this.stepPeople();
+          this.stepTraffic();
+          this.stepAI();
+          this.collide();
+          if (this.flash > 0) this.flash -= DT;
+        }
+        result() {
+          const km = this.s.dist / 1000,
+            inc = this.s.crashes + this.s.hits;
+          return {
+            view: this.o.view,
+            think: this.o.think,
+            crashes: this.s.crashes,
+            hits: this.s.hits,
+            dist: Math.round(this.s.dist),
+            best: Math.round(this.s.best),
+            mph: (this.s.dist / this.t) * MPH,
+            ipk: km > 0 ? inc / km : 0,
+          };
+        }
+      }
+
+      const $ = (id) => document.getElementById(id);
+      function opts() {
+        return {
+          view: +$("view").value,
+          think: +$("think").value,
+          cruise: +$("limit").value / MPH,
+          traffic: +$("traffic").value,
+          peds: +$("peds").value,
+          lanes: $("lanes").checked,
+        };
+      }
+      function syncOutputs() {
+        $("viewOut").textContent = $("view").value + " m";
+        $("thinkOut").textContent = $("think").value + " ms";
+        $("limitOut").textContent = $("limit").value + " mph";
+        if (sim) Object.assign(sim.o, opts(), { seed: sim.o.seed });
+      }
+      ["view", "think", "limit", "traffic", "peds", "lanes"].forEach((id) =>
+        $(id).addEventListener("input", syncOutputs),
+      );
+      let sim = null;
+      function newSim() {
+        sim = new Sim({ ...opts(), seed: (Math.random() * 1e9) | 0 });
+      }
+      newSim();
+      syncOutputs();
+      $("reset").onclick = newSim;
+
+      const cv = $("cv"),
+        ctx = cv.getContext("2d");
+      const TRAFFIC_COL = ["#C9CDD2", "#7D8794", "#A2493E", "#3F6290", "#D7C9A4"];
+      function rr(x, y, w, h, r) {
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+        else ctx.rect(x, y, w, h);
+      }
+      function drawCar(cx, cy, l, w, col, brk) {
+        const x = cx - l / 2,
+          y = cy - w / 2;
+        ctx.fillStyle = col;
+        rr(x, y, l, w, w * 0.28);
+        ctx.fill();
+        ctx.fillStyle = "rgba(18,26,34,.72)";
+        rr(cx + l * 0.06, y + w * 0.13, l * 0.2, w * 0.74, w * 0.12);
+        ctx.fill();
+        ctx.fillStyle = "rgba(18,26,34,.5)";
+        rr(cx - l * 0.4, y + w * 0.16, l * 0.13, w * 0.68, w * 0.1);
+        ctx.fill();
+        if (brk) {
+          ctx.fillStyle = "#FF3B30";
+          ctx.fillRect(x - 1, y + w * 0.06, Math.max(2, l * 0.05), w * 0.24);
+          ctx.fillRect(x - 1, y + w * 0.7, Math.max(2, l * 0.05), w * 0.24);
+        }
+      }
+      function draw() {
+        const dpr = window.devicePixelRatio || 1,
+          cw = cv.clientWidth,
+          ch = cv.clientHeight;
+        if (cv.width !== Math.round(cw * dpr) || cv.height !== Math.round(ch * dpr)) {
+          cv.width = Math.round(cw * dpr);
+          cv.height = Math.round(ch * dpr);
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const k = ch / (ROAD + 7),
+          top = 3.5,
+          a = sim.ai,
+          camX = a.x - (cw / k) * 0.16;
+        const X = (x) => (x - camX) * k,
+          Y = (y) => (y + top) * k,
+          x1 = camX + cw / k;
+        ctx.fillStyle = "#55624F";
+        ctx.fillRect(0, 0, cw, ch);
+        ctx.fillStyle = "#B4B8AF";
+        ctx.fillRect(0, Y(-3), cw, 3 * k);
+        ctx.fillRect(0, Y(ROAD), cw, 3 * k);
+        ctx.fillStyle = "#9EA299";
+        for (let x = Math.floor(camX / 3) * 3; x < x1; x += 3) {
+          ctx.fillRect(X(x), Y(-3), 1, 3 * k);
+          ctx.fillRect(X(x), Y(ROAD), 1, 3 * k);
+        }
+        ctx.fillStyle = "#303538";
+        ctx.fillRect(0, Y(0), cw, ROAD * k);
+        ctx.fillStyle = "#E9ECE6";
+        ctx.fillRect(0, Y(0.15), cw, Math.max(1.5, 0.12 * k));
+        ctx.fillRect(0, Y(ROAD - 0.27), cw, Math.max(1.5, 0.12 * k));
+        ctx.fillStyle = "rgba(233,236,230,.85)";
+        for (let i = 1; i < NL; i++)
+          for (let x = Math.floor(camX / 12) * 12; x < x1; x += 12)
+            ctx.fillRect(X(x), Y(i * LANE) - 0.06 * k, 3 * k, Math.max(1.5, 0.12 * k));
+        ctx.fillStyle = "#2E3335";
+        ctx.font = "600 " + Math.max(9, Math.round(k * 1.1)) + "px Consolas,monospace";
+        ctx.textBaseline = "middle";
+        for (let x = Math.floor(camX / 100) * 100; x < x1; x += 100) {
+          ctx.fillRect(X(x), Y(ROAD + 0.4), 2, k * 1.2);
+          ctx.fillText(
+            x >= 1000 ? (x / 1000).toFixed(1) + " km" : x + " m",
+            X(x) + 5,
+            Y(ROAD + 1.6),
+          );
+        }
+        const zx = X(a.x + L / 2),
+          zw = sim.o.view * k,
+          zy = Y(a.y - 1.7),
+          zh = 3.4 * k;
+        const g = ctx.createLinearGradient(zx, 0, zx + zw, 0);
+        const hot = sim.cur ? "255,90,78" : "242,193,78";
+        g.addColorStop(0, "rgba(" + hot + ",.42)");
+        g.addColorStop(1, "rgba(" + hot + ",.08)");
+        ctx.fillStyle = g;
+        ctx.fillRect(zx, zy, zw, zh);
+        ctx.strokeStyle = "rgba(" + hot + ",.9)";
+        ctx.setLineDash([5, 4]);
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(zx, zy, zw, zh);
+        ctx.setLineDash([]);
+        if (sim.seen) {
+          const gx = X(a.x + L / 2 + sim.seen.gap);
+          ctx.fillStyle = "#FF5A4E";
+          ctx.fillRect(gx - 1.5, zy - 3, 3, zh + 6);
+        }
+        for (const p of sim.peds) {
+          ctx.fillStyle = "#F2E6D0";
+          ctx.beginPath();
+          ctx.arc(X(p.x), Y(p.y), Math.max(3, 0.42 * k), 0, 7);
+          ctx.fill();
+          ctx.fillStyle = "#4A3628";
+          ctx.beginPath();
+          ctx.arc(X(p.x), Y(p.y), Math.max(1.6, 0.22 * k), 0, 7);
+          ctx.fill();
+        }
+        for (const c of sim.cars)
+          if (c.x > camX - 5 && c.x < x1 + 5)
+            drawCar(X(c.x), Y(c.y), L * k, W * k, TRAFFIC_COL[c.col], c.a < -1);
+        drawCar(X(a.x), Y(a.y), L * k, W * k, "#2FB47A", a.a < -1);
+        ctx.fillStyle = "#F2C14E";
+        ctx.beginPath();
+        ctx.arc(X(a.x + L / 2 - 0.3), Y(a.y), Math.max(2, 0.22 * k), 0, 7);
+        ctx.fill();
+        if (sim.flash > 0) {
+          ctx.fillStyle = "rgba(255,59,48," + sim.flash * 0.5 + ")";
+          ctx.fillRect(0, 0, cw, ch);
+        }
+      }
+      function hud() {
+        const s = sim.s;
+        $("sSpeed").textContent = Math.round(sim.ai.v * MPH) + " mph";
+        $("sTime").textContent = fmtTime(sim.t);
+        $("sDist").textContent =
+          s.dist >= 1000 ? (s.dist / 1000).toFixed(2) + " km" : Math.round(s.dist) + " m";
+        $("sCrash").textContent = s.crashes;
+        $("sCrash").classList.toggle("alert", s.crashes > 0);
+        $("sHit").textContent = s.hits;
+        $("sHit").classList.toggle("alert", s.hits > 0);
+        $("sBest").textContent = Math.round(s.best) + " m";
+        $("last").textContent = s.last
+          ? "Last incident: " + s.last + "."
+          : "No crashes yet.";
+        const chip = $("chip");
+        if (chip.dataset.s !== sim.ai.state) {
+          chip.dataset.s = sim.ai.state;
+          chip.textContent = sim.ai.state;
+        }
+      }
+
+      let last = performance.now(),
+        accum = 0,
+        speed = 1,
+        paused = false;
+      function frame(now) {
+        const dt = Math.min(0.1, (now - last) / 1000);
+        last = now;
+        if (!paused) {
+          accum += dt * speed;
+          let n = 0;
+          while (accum >= DT && n < 600) {
+            sim.step();
+            accum -= DT;
+            n++;
+          }
+          if (n >= 600) accum = 0;
+        }
+        draw();
+        hud();
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+      $("pause").onclick = () => {
+        paused = !paused;
+        $("pause").textContent = paused ? "Play" : "Pause";
+        $("pause").setAttribute("aria-pressed", paused);
+      };
+      document.querySelectorAll("[data-speed]").forEach(
+        (b) =>
+          (b.onclick = () => {
+            speed = +b.dataset.speed;
+            document
+              .querySelectorAll("[data-speed]")
+              .forEach((x) => x.setAttribute("aria-pressed", x === b));
+          }),
+      );
+
+      let results = [];
+      try {
+        results = JSON.parse(localStorage.getItem("aicar-results") || "[]");
+      } catch (e) {
+        results = [];
+      }
+      const save = () => {
+        try {
+          localStorage.setItem("aicar-results", JSON.stringify(results));
+        } catch (e) {}
+      };
+      const parseList = (s, lo, hi) =>
+        [
+          ...new Set(
+            s
+              .split(/[\s,]+/)
+              .map(Number)
+              .filter((n) => Number.isFinite(n) && n >= lo && n <= hi),
+          ),
+        ].sort((a, b) => a - b);
+      let stopFlag = false;
+      async function runJobs(jobs) {
+        const dur = +$("dur").value,
+          steps = Math.round(dur / DT),
+          base = opts();
+        stopFlag = false;
+        ["runAll", "runOne"].forEach((id) => ($(id).disabled = true));
+        $("stop").disabled = false;
+        for (let j = 0; j < jobs.length && !stopFlag; j++) {
+          const job = jobs[j];
+          const s = new Sim({
+            ...base,
+            view: job.view,
+            think: job.think,
+            seed: 1000 + job.trial * 7919,
+          });
+          for (let i = 0; i < steps; i += 3000) {
+            const end = Math.min(steps, i + 3000);
+            for (let n = i; n < end; n++) s.step();
+            $("prog").style.width = ((j + end / steps) / jobs.length) * 100 + "%";
+            $("progText").textContent =
+              "Run " +
+              (j + 1) +
+              " of " +
+              jobs.length +
+              ": view " +
+              job.view +
+              " m, think " +
+              job.think +
+              " ms";
+            await new Promise((r) => setTimeout(r, 0));
+            if (stopFlag) break;
+          }
+          if (!stopFlag) {
+            results.push({ ...s.result(), trial: job.trial + 1 });
+            save();
+            render();
+          }
+        }
+        $("progText").textContent = stopFlag
+          ? "Stopped."
+          : "Done: " + jobs.length + " runs added.";
+        ["runAll", "runOne"].forEach((id) => ($(id).disabled = false));
+        $("stop").disabled = true;
+      }
+      $("runAll").onclick = () => {
+        const views = parseList($("views").value, 5, 300),
+          thinks = parseList($("thinks").value, 0, 5000),
+          n = Math.max(1, Math.min(10, +$("trials").value || 1));
+        if (!views.length || !thinks.length) {
+          $("progText").textContent =
+            "Type at least one number in each box, like 20, 50, 90.";
+          return;
+        }
+        const jobs = [];
+        for (const t of thinks)
+          for (const v of views)
+            for (let k = 0; k < n; k++) jobs.push({ view: v, think: t, trial: k });
+        runJobs(jobs);
+      };
+      $("runOne").onclick = () => {
+        const n = Math.max(1, Math.min(10, +$("trials").value || 1)),
+          o = opts(),
+          jobs = [];
+        for (let k = 0; k < n; k++) jobs.push({ view: o.view, think: o.think, trial: k });
+        runJobs(jobs);
+      };
+      $("stop").onclick = () => {
+        stopFlag = true;
+      };
+      $("clear").onclick = () => {
+        results = [];
+        save();
+        render();
+        $("prog").style.width = "0";
+        $("progText").textContent = "";
+      };
+
+      function render() {
+        const tb = $("rows");
+        tb.innerHTML = results
+          .map(
+            (r, i) =>
+              `<tr><td>${i + 1}</td><td>${r.view}</td><td>${r.think}</td><td>${r.trial}</td><td>${r.crashes}</td><td>${r.hits}</td><td>${r.dist.toLocaleString()}</td><td>${r.best.toLocaleString()}</td><td>${r.mph.toFixed(1)}</td><td>${r.ipk.toFixed(2)}</td></tr>`,
+          )
+          .join("");
+        $("rowsEmpty").hidden = results.length > 0;
+        const box = tb.closest(".results-wrap");
+        box.scrollTop = box.scrollHeight;
+        const m = $("matrix");
+        if (!results.length) {
+          m.innerHTML = '<div class="empty">Run the experiment to fill this grid.</div>';
+          return;
+        }
+        const views = [...new Set(results.map((r) => r.view))].sort((a, b) => a - b),
+          thinks = [...new Set(results.map((r) => r.think))].sort((a, b) => a - b);
+        const cell = {};
+        for (const r of results) {
+          const key = r.view + "|" + r.think,
+            c = cell[key] || (cell[key] = { inc: 0, km: 0, t: 0, n: 0 });
+          c.inc += r.crashes + r.hits;
+          c.km += r.dist / 1000;
+          c.t += r.dist / (r.mph / MPH || 1);
+          c.n++;
+        }
+        const list = Object.entries(cell).map(([k, c]) => ({
+          k,
+          ipk: c.km ? c.inc / c.km : 0,
+          mph: c.t ? ((c.km * 1000) / c.t) * MPH : 0,
+          n: c.n,
+        }));
+        const lo = Math.min(...list.map((c) => c.ipk)),
+          hi = Math.max(...list.map((c) => c.ipk));
+        const best = list.slice().sort((a, b) => a.ipk - b.ipk || b.mph - a.mph)[0].k;
+        const byKey = Object.fromEntries(list.map((c) => [c.k, c]));
+        let h =
+          '<table class="matrix"><thead><tr><th>Think &darr; / View &rarr;</th>' +
+          views.map((v) => `<th style="text-align:center">${v} m</th>`).join("") +
+          "</tr></thead><tbody>";
+        for (const t of thinks) {
+          h += `<tr><th scope="row">${t} ms</th>`;
+          for (const v of views) {
+            const c = byKey[v + "|" + t];
+            if (!c) {
+              h += "<td>&ndash;</td>";
+              continue;
+            }
+            const f = hi > lo ? (c.ipk - lo) / (hi - lo) : 0,
+              cls = f < 0.34 ? "good" : f < 0.67 ? "warn" : "bad";
+            h += `<td class="cell ${cls}"><b>${c.ipk.toFixed(2)}</b><small>${c.mph.toFixed(0)} mph avg &middot; ${c.n} run${c.n > 1 ? "s" : ""}</small>${c.k === best ? '<br><span class="best-tag">(safest)</span>' : ""}</td>`;
+          }
+          h += "</tr>";
+        }
+        m.innerHTML = h + "</tbody></table>";
+      }
+      render();
+
+      $("copy").onclick = () => {
+        const head =
+          "Run,View (m),Think (ms),Trial,Crashes,People hit,Distance (m),Longest safe (m),Avg mph,Incidents per km";
+        const csv = [
+          head,
+          ...results.map((r, i) =>
+            [
+              i + 1,
+              r.view,
+              r.think,
+              r.trial,
+              r.crashes,
+              r.hits,
+              r.dist,
+              r.best,
+              r.mph.toFixed(1),
+              r.ipk.toFixed(3),
+            ].join(","),
+          ),
+        ].join("\n");
+        const box = $("csvBox");
+        box.value = csv;
+        const fallback = () => {
+          box.hidden = false;
+          box.focus();
+          box.select();
+          $("copy").textContent = "Select all, then copy";
+        };
+        try {
+          navigator.clipboard.writeText(csv).then(() => {
+            $("copy").textContent = "Copied";
+            setTimeout(() => ($("copy").textContent = "Copy for spreadsheet"), 1500);
+          }, fallback);
+        } catch (e) {
+          fallback();
+        }
+      };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+    <script>
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default",
+      });
+    </script>
+  </body>
+</html>
